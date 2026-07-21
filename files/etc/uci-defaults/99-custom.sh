@@ -19,7 +19,7 @@ SETTINGS_FILE="/etc/config/pppoe-settings"
 if [ ! -f "$SETTINGS_FILE" ]; then
     echo "PPPoE settings file not found. Skipping." >>$LOGFILE
 else
-    # 读取pppoe信息($enable_pppoe、$pppoe_account、$pppoe_password)
+    # 读取构建设置($enable_pppoe、$pppoe_account、$pppoe_password、$enable_ipv6)
     . "$SETTINGS_FILE"
 fi
 
@@ -74,10 +74,15 @@ elif [ "$count" -gt 1 ]; then
     uci set network.wan.device="$wan_ifname"
     uci set network.wan.proto='dhcp'
 
-    # 配置WAN6
+    # 配置WAN6，25.12 x86-64 构建默认请求 IPv6 地址和前缀委派
     uci set network.wan6=interface
     uci set network.wan6.device="$wan_ifname"
     uci set network.wan6.proto='dhcpv6'
+    uci set network.wan6.reqaddress='try'
+    uci set network.wan6.reqprefix='auto'
+    if [ "$enable_ipv6" = "yes" ]; then
+        uci set network.lan.ip6assign='64'
+    fi
 
     # 查找 br-lan 设备 section
     section=$(uci show network | awk -F '[.=]' '/\.@?device\[\d+\]\.name=.br-lan.$/ {print $2; exit}')
@@ -118,7 +123,18 @@ elif [ "$count" -gt 1 ]; then
         uci set network.wan.password="$pppoe_password"
         uci set network.wan.peerdns='1'
         uci set network.wan.auto='1'
-        uci set network.wan6.proto='none'
+        if [ "$enable_ipv6" = "yes" ]; then
+            # PPPoE 的 DHCPv6 客户端必须绑定逻辑 WAN，而不是物理网卡
+            uci set network.wan.ipv6='1'
+            uci set network.wan6.device='@wan'
+            uci set network.wan6.proto='dhcpv6'
+            uci set network.wan6.reqaddress='try'
+            uci set network.wan6.reqprefix='auto'
+            uci set network.lan.ip6assign='64'
+            echo "IPv6 enabled for PPPoE." >>$LOGFILE
+        else
+            uci set network.wan6.proto='none'
+        fi
         echo "PPPoE config done." >>$LOGFILE
     else
         echo "PPPoE not enabled." >>$LOGFILE
