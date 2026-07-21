@@ -16,6 +16,8 @@ cat << EOF > /home/build/immortalwrt/files/etc/config/pppoe-settings
 enable_pppoe=${ENABLE_PPPOE}
 pppoe_account=${PPPOE_ACCOUNT}
 pppoe_password=${PPPOE_PASSWORD}
+# 25.12 x86-64 默认启用 IPv6
+enable_ipv6=yes
 EOF
 
 echo "cat pppoe-settings"
@@ -59,6 +61,11 @@ PACKAGES="$PACKAGES openssh-sftp-server"
 
 # 文件管理器
 PACKAGES="$PACKAGES luci-i18n-filemanager-zh-cn"
+
+# x86-64 作为纯有线路由使用，明确排除 Wi-Fi 服务、工具和内核无线模块
+PACKAGES="$PACKAGES -wifi-scripts -wireless-regdb -hostapd-common -iw"
+PACKAGES="$PACKAGES -kmod-cfg80211 -kmod-mac80211"
+
 # ======== shell/apk-custom-packages.sh =======
 # 合并imm仓库以外的第三方插件 暂时注释
 PACKAGES="$PACKAGES $CUSTOM_PACKAGES"
