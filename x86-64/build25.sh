@@ -66,6 +66,9 @@ PACKAGES="$PACKAGES luci-i18n-filemanager-zh-cn"
 PACKAGES="$PACKAGES -wifi-scripts -wireless-regdb -hostapd-common -iw"
 PACKAGES="$PACKAGES -kmod-cfg80211 -kmod-mac80211"
 
+# x86-64 主路由不使用 mwan3 多 WAN/多拨，明确排除服务、LuCI 页面和中文语言包
+PACKAGES="$PACKAGES -mwan3 -luci-app-mwan3 -luci-i18n-mwan3-zh-cn"
+
 # ======== shell/apk-custom-packages.sh =======
 # 合并imm仓库以外的第三方插件 暂时注释
 PACKAGES="$PACKAGES $CUSTOM_PACKAGES"
