@@ -50,12 +50,22 @@ MOSDNS_PACKAGE_DIR="/tmp/mosdns-packages"
 MOSDNS_SHA256="76123d2e21a72a8bde89da7c45dd87b5791cc6249983386d4b4746cd5fa520bb"
 
 echo "⬇️ 下载 MosDNS $MOSDNS_VERSION（OpenWrt 25.12 x86-64）"
-curl --fail --location --retry 3 --output "$MOSDNS_ARCHIVE" "$MOSDNS_URL"
-echo "$MOSDNS_SHA256  $MOSDNS_ARCHIVE" | sha256sum -c -
+if ! curl --fail --location --retry 3 --output "$MOSDNS_ARCHIVE" "$MOSDNS_URL"; then
+  echo "❌ MosDNS 发布包下载失败"
+  exit 1
+fi
+
+if ! echo "$MOSDNS_SHA256  $MOSDNS_ARCHIVE" | sha256sum -c -; then
+  echo "❌ MosDNS 发布包 SHA-256 校验失败"
+  exit 1
+fi
 
 rm -rf "$MOSDNS_PACKAGE_DIR"
 mkdir -p "$MOSDNS_PACKAGE_DIR" /home/build/immortalwrt/packages
-tar -xzf "$MOSDNS_ARCHIVE" -C "$MOSDNS_PACKAGE_DIR"
+if ! tar -xzf "$MOSDNS_ARCHIVE" -C "$MOSDNS_PACKAGE_DIR"; then
+  echo "❌ MosDNS 发布包解压失败"
+  exit 1
+fi
 
 for package in mosdns luci-app-mosdns luci-i18n-mosdns-zh-cn v2dat v2ray-geosite; do
   if ! compgen -G "$MOSDNS_PACKAGE_DIR/packages_ci/$package-*.apk" >/dev/null; then
