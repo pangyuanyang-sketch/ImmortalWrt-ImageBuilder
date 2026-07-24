@@ -41,6 +41,32 @@ else
   ls -lah /home/build/immortalwrt/packages/
 fi
 
+# MosDNS v5：使用上游为 OpenWrt 25.12 x86-64 发布的 APK，并校验下载完整性
+MOSDNS_VERSION="v5.3.4-r5"
+MOSDNS_ASSET="x86_64-openwrt-25.12.tar.gz"
+MOSDNS_URL="https://github.com/sbwml/luci-app-mosdns/releases/download/$MOSDNS_VERSION/$MOSDNS_ASSET"
+MOSDNS_ARCHIVE="/tmp/$MOSDNS_ASSET"
+MOSDNS_PACKAGE_DIR="/tmp/mosdns-packages"
+MOSDNS_SHA256="76123d2e21a72a8bde89da7c45dd87b5791cc6249983386d4b4746cd5fa520bb"
+
+echo "⬇️ 下载 MosDNS $MOSDNS_VERSION（OpenWrt 25.12 x86-64）"
+curl --fail --location --retry 3 --output "$MOSDNS_ARCHIVE" "$MOSDNS_URL"
+echo "$MOSDNS_SHA256  $MOSDNS_ARCHIVE" | sha256sum -c -
+
+rm -rf "$MOSDNS_PACKAGE_DIR"
+mkdir -p "$MOSDNS_PACKAGE_DIR" /home/build/immortalwrt/packages
+tar -xzf "$MOSDNS_ARCHIVE" -C "$MOSDNS_PACKAGE_DIR"
+
+for package in mosdns luci-app-mosdns luci-i18n-mosdns-zh-cn v2dat v2ray-geosite; do
+  if ! compgen -G "$MOSDNS_PACKAGE_DIR/packages_ci/$package-*.apk" >/dev/null; then
+    echo "❌ MosDNS 发布包缺少 $package APK"
+    exit 1
+  fi
+done
+
+cp -v "$MOSDNS_PACKAGE_DIR"/packages_ci/*.apk /home/build/immortalwrt/packages/
+echo "✅ MosDNS APK 已加入本地软件包目录"
+
 
 # 输出调试信息
 echo "$(date '+%Y-%m-%d %H:%M:%S') - 开始构建固件..."
@@ -61,6 +87,9 @@ PACKAGES="$PACKAGES openssh-sftp-server"
 
 # 文件管理器
 PACKAGES="$PACKAGES luci-i18n-filemanager-zh-cn"
+
+# MosDNS v5、LuCI 中文界面及完整运行依赖
+PACKAGES="$PACKAGES mosdns luci-app-mosdns luci-i18n-mosdns-zh-cn v2dat v2ray-geoip v2ray-geosite"
 
 # x86-64 作为纯有线路由使用，明确排除 Wi-Fi 服务、工具和内核无线模块
 PACKAGES="$PACKAGES -wifi-scripts -wireless-regdb -hostapd-common -iw"
