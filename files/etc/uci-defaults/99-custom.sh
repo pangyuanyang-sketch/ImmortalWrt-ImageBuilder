@@ -37,26 +37,10 @@ count=$(echo "$ifnames" | wc -w)
 echo "Detected physical interfaces: $ifnames" >>$LOGFILE
 echo "Interface count: $count" >>$LOGFILE
 
-# 2. 根据板子型号映射WAN和LAN接口
-board_name=$(cat /tmp/sysinfo/board_name 2>/dev/null || echo "unknown")
-echo "Board detected: $board_name" >>$LOGFILE
-
-wan_ifname=""
-lan_ifnames=""
-# 此处特殊处理个别开发板网口顺序问题
-case "$board_name" in
-    "radxa,e20c"|"friendlyarm,nanopi-r5c")
-        wan_ifname="eth1"
-        lan_ifnames="eth0"
-        echo "Using $board_name mapping: WAN=$wan_ifname LAN=$lan_ifnames" >>"$LOGFILE"
-        ;;
-    *)
-        # 默认第一个接口为WAN，其余为LAN
-        wan_ifname=$(echo "$ifnames" | awk '{print $1}')
-        lan_ifnames=$(echo "$ifnames" | cut -d ' ' -f2-)
-        echo "Using default mapping: WAN=$wan_ifname LAN=$lan_ifnames" >>"$LOGFILE"
-        ;;
-esac
+# 2. 固定 WAN 和 LAN 接口映射
+wan_ifname="eth1"
+lan_ifnames="eth0 eth2 eth3"
+echo "Using fixed mapping: WAN=$wan_ifname LAN=$lan_ifnames" >>"$LOGFILE"
 
 # 3. 配置网络
 if [ "$count" -eq 1 ]; then
