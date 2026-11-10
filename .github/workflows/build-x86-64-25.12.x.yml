@@ -107,7 +107,8 @@ jobs:
           git clone --depth=1 https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community.git package/custom/tailscale-community
 
           # ImmortalWrt 自带的 MosDNS / geodata 与 sbwml v5 不能混用。
-          rm -rf feeds/packages/net/mosdns feeds/packages/net/v2ray-geodata
+          rm -rf feeds/packages/net/mosdns feeds/packages/net/v2ray-geodata \
+            package/feeds/packages/mosdns package/feeds/packages/v2ray-geodata
           git clone --depth=1 --branch v5 https://github.com/sbwml/luci-app-mosdns.git package/custom/mosdns
           git clone --depth=1 https://github.com/sbwml/v2ray-geodata.git package/custom/v2ray-geodata
 
