@@ -1,4 +1,4 @@
-name: Build current stable 25.12 x86-64
+name: Build current ImmortalWrt mainline x86-64
 
 on:
   workflow_dispatch:
@@ -48,7 +48,7 @@ jobs:
     timeout-minutes: 360
     env:
       SOURCE_REPOSITORY: https://github.com/immortalwrt/immortalwrt.git
-      SOURCE_REF: openwrt-25.12
+      SOURCE_REF: master
       OPENWRT_DIR: immortalwrt
 
     steps:
@@ -77,7 +77,7 @@ jobs:
             python3-ply python3-setuptools qemu-utils rsync scons subversion swig \
             texinfo uglifyjs upx-ucl unzip vim wget xmlto xsltproc zlib1g-dev
 
-      - name: Clone current 25.12 stable source
+      - name: Clone current ImmortalWrt mainline source
         run: |
           git clone --depth=1 --branch "$SOURCE_REF" "$SOURCE_REPOSITORY" "$OPENWRT_DIR"
           cd "$OPENWRT_DIR"
@@ -151,9 +151,9 @@ jobs:
       - name: Create release notes
         run: |
           cat > router-info.md <<EOF
-          ## x86-64 固件（完整源码编译）
+          ## x86-64 固件（ImmortalWrt 主线完整源码编译）
 
-          - 稳定来源：\`openwrt-25.12\`
+          - 来源分支：\`master\`（主线最新提交）
           - 源码提交：\`${SOURCE_COMMIT}\`
           - 源码时间：${SOURCE_DATE}
           - 管理地址：${{ inputs.custom_router_ip }}
