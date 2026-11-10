@@ -108,6 +108,16 @@ EOF
 
 make defconfig
 
+# Never silently publish a firmware that omitted a selected application because a
+# third-party feed changed its package name or failed to load.
+for package in "${PACKAGES[@]}"; do
+  [[ -n "$package" && "$package" != -* ]] || continue
+  if ! grep -qx "CONFIG_PACKAGE_${package}=y" .config; then
+    echo "Selected package is unavailable in the current source tree: ${package}" >&2
+    exit 1
+  fi
+done
+
 # FILES is copied by the image build.  Keep secrets only in the generated image;
 # neither the source repository nor the release notes contain PPPoE credentials.
 rm -rf files
