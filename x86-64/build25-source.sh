@@ -47,6 +47,7 @@ sed -i \
   -e "s/^CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=${PROFILE}/" \
   .config
 
+CUSTOM_PACKAGES=${CUSTOM_PACKAGES:-}
 source "$REPO_DIR/shell/apk-custom-packages.sh"
 
 PACKAGES=(
