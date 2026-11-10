@@ -1,142 +1,170 @@
-name: Build 25.12.x x86-64
+name: Build current stable 25.12 x86-64
+
 on:
   workflow_dispatch:
     inputs:
-      luci_version:
-        description: "选择luci版本"
-        required: false
-        default: "25.12.1"
-        type: choice
-        options:
-          - 25.12.0-rc1
-          - 25.12.0-rc2
-          - 25.12.0
-          - 25.12.1
       custom_router_ip:
-        description: "请设置路由器的管理地址(仅对多网口路由器有效) 格式:192.168.x.1 或 10.x.x.1"
+        description: "路由器管理地址，例如 192.168.30.1"
         required: true
         default: "192.168.100.1"
       profile:
-        description: '请输入要编译固件大小 单位(MB)'
+        description: "固件磁盘根分区大小（MB）"
         required: true
-        default: '1024'
+        default: "1024"
       enable_store:
-        description: "集成 store 商店"
+        description: "集成 iStore"
         required: false
         type: boolean
         default: false
       include_docker:
-        description: |
-          是否编译 Docker 插件
+        description: "集成 Docker 与 Dockerman"
         required: true
-        default: 'yes'
         type: choice
-        options:
-          - 'yes'
-          - 'no'
+        default: "yes"
+        options: ["yes", "no"]
       enable_pppoe:
-        description: "是否配置PPPoE拨号信息?"
+        description: "写入 PPPoE 拨号信息"
         required: true
-        default: 'no'
         type: choice
-        options:
-        - 'yes'
-        - 'no'
+        default: "no"
+        options: ["yes", "no"]
       pppoe_account:
-        description: "宽带账号 (若启用PPPoE)"
+        description: "宽带账号（仅 PPPoE 启用时）"
         required: false
       pppoe_password:
-        description: "宽带密码 (若启用PPPoE)"
+        description: "宽带密码（仅 PPPoE 启用时）"
         required: false
 
 permissions:
   contents: write
 
+concurrency:
+  group: x86-64-current-25-12
+  cancel-in-progress: false
+
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      SOURCE_REPOSITORY: https://github.com/immortalwrt/immortalwrt.git
+      SOURCE_REF: openwrt-25.12
+      OPENWRT_DIR: immortalwrt
 
     steps:
-      - name: Checkout code
+      - name: Checkout configuration repository
         uses: actions/checkout@v6
 
-      - name: Set executable permissions
-        run: chmod +x ${{ github.workspace }}/x86-64/build25.sh
-
-      - name: Save Custom Router IP into OpenWrt files
+      - name: Validate PPPoE inputs
+        shell: bash
         run: |
-          mkdir -p "${{ github.workspace }}/custom"
-          echo "${{ github.event.inputs.custom_router_ip }}" > "${{ github.workspace }}/custom/custom_router_ip.txt"
-          echo "您设置的路由器管理地址是:${{ github.event.inputs.custom_router_ip }}"
-          # 后续步骤会将该文件映射到路由器/etc/config/custom_router_ip.txt 以便用于开机脚本99-custom.sh读取用户设置的ip
-      
-      - name: Validate PPPoE Inputs
-        run: |
-          if [[ "${{ inputs.enable_pppoe }}" == "yes" ]]; then
-            if [[ -z "${{ inputs.pppoe_account }}" || -z "${{ inputs.pppoe_password }}" ]]; then
-              echo "Error: PPPoE account and password must be provided when PPPoE is enabled!"
-              exit 1
-            fi
-          fi
-      
-      - name: Enable Store integration
-        run: |
-          if [ "${{ github.event.inputs.enable_store }}" == "true" ]; then
-            echo 'CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-store"' >> shell/apk-custom-packages.sh
-            echo "✅ 已追加 luci-app-store"
-          else
-            echo "❎ 未启用 luci-app-store"
+          set -euo pipefail
+          if [[ "${{ inputs.enable_pppoe }}" == "yes" ]] && \
+             [[ -z "${{ inputs.pppoe_account }}" || -z "${{ inputs.pppoe_password }}" ]]; then
+            echo "PPPoE 启用时必须同时填写账号和密码。"
+            exit 1
           fi
 
-      - name: Build ImmortalWrt-x86-64-efi 25.12.x
+      - name: Install build dependencies
         run: |
-          profile="${{ github.event.inputs.profile }}"
-          include_docker="${{ github.event.inputs.include_docker }}"
-          luci_version="${{ github.event.inputs.luci_version }}"
-          echo "Building for profile: $profile"
-          docker run --rm -i \
-            --user root \
-            -v "${{ github.workspace }}/bin:/home/build/immortalwrt/bin" \
-            -v "${{ github.workspace }}/files:/home/build/immortalwrt/files" \
-            -v "${{ github.workspace }}/custom:/home/build/immortalwrt/files/etc/config" \
-            -v "${{ github.workspace }}/x86-64/imm25.config:/home/build/immortalwrt/.config" \
-            -v "${{ github.workspace }}/shell:/home/build/immortalwrt/shell" \
-            -v "${{ github.workspace }}/x86-64/build25.sh:/home/build/immortalwrt/build.sh" \
-            -e PROFILE=$profile \
-            -e INCLUDE_DOCKER=$include_docker \
-            -e ENABLE_PPPOE=${{ inputs.enable_pppoe }} \
-            -e PPPOE_ACCOUNT=${{ inputs.pppoe_account }} \
-            -e PPPOE_PASSWORD=${{ inputs.pppoe_password }} \
-          immortalwrt/imagebuilder:x86-64-openwrt-${luci_version} /bin/bash /home/build/immortalwrt/build.sh
-          
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ack antlr3 asciidoc autoconf automake bash binutils bison build-essential \
+            bzip2 ccache cmake cpio curl device-tree-compiler ecj fastjar flex g++ \
+            gawk gcc-multilib gettext git gperf haveged help2man intltool libelf-dev \
+            libncurses5-dev libncursesw5-dev libssl-dev libtool lrzsz mkisofs msmtp \
+            nano ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip \
+            python3-ply python3-setuptools qemu-utils rsync scons subversion swig \
+            texinfo uglifyjs upx-ucl unzip vim wget xmlto xsltproc zlib1g-dev
 
-      - name: Create info
+      - name: Clone current 25.12 stable source
         run: |
-          cat > ${{ github.workspace }}/router-info.md <<EOF
-          ## 📡 路由器后台信息
-          <a href="https://wkdaily.cpolar.cn/archives/1">
-           <img src="https://img.shields.io/badge/若下载慢可套用国内加速站下载-FC7C0D?logo=github&logoColor=fff&labelColor=000&style=for-the-badge"/>
-          </a>
-          
-          - 🏠 **后台地址**: ${{ github.event.inputs.custom_router_ip }}
-          - 👤 **用户名**: root
-          - 🔑 **密码**: 无
+          git clone --depth=1 --branch "$SOURCE_REF" "$SOURCE_REPOSITORY" "$OPENWRT_DIR"
+          cd "$OPENWRT_DIR"
+          echo "SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE=$(git show -s --format=%cI HEAD)" >> "$GITHUB_ENV"
+
+      - name: Add third-party source packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$OPENWRT_DIR"
+
+          cat >> feeds.conf.default <<'EOF'
+          src-git helloworld https://github.com/fw876/helloworld.git
+          src-git istore https://github.com/linkease/istore.git
+          src-git dockerman https://github.com/lisaac/luci-app-dockerman.git
+          EOF
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+          mkdir -p package/custom
+          git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages.git package/custom/passwall-packages
+          git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall.git package/custom/passwall
+          git clone --depth=1 https://github.com/gdy666/luci-app-lucky.git package/custom/lucky
+          git clone --depth=1 https://github.com/sirpdboy/luci-app-taskplan.git package/custom/taskplan
+          git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki.git package/custom/nikki
+          git clone --depth=1 https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community.git package/custom/tailscale-community
+
+          # ImmortalWrt 自带的 MosDNS / geodata 与 sbwml v5 不能混用。
+          rm -rf feeds/packages/net/mosdns feeds/packages/net/v2ray-geodata
+          git clone --depth=1 --branch v5 https://github.com/sbwml/luci-app-mosdns.git package/custom/mosdns
+          git clone --depth=1 https://github.com/sbwml/v2ray-geodata.git package/custom/v2ray-geodata
+
+      - name: Prepare source configuration
+        shell: bash
+        env:
+          PROFILE: ${{ inputs.profile }}
+          CUSTOM_ROUTER_IP: ${{ inputs.custom_router_ip }}
+          INCLUDE_DOCKER: ${{ inputs.include_docker }}
+          ENABLE_STORE: ${{ inputs.enable_store }}
+          ENABLE_PPPOE: ${{ inputs.enable_pppoe }}
+          PPPOE_ACCOUNT: ${{ inputs.pppoe_account }}
+          PPPOE_PASSWORD: ${{ inputs.pppoe_password }}
+        run: |
+          set -euo pipefail
+          chmod +x x86-64/build25-source.sh
+          ./x86-64/build25-source.sh "$OPENWRT_DIR"
+
+      - name: Download source archives
+        run: |
+          cd "$OPENWRT_DIR"
+          make download -j8
+
+      - name: Build firmware from source
+        run: |
+          cd "$OPENWRT_DIR"
+          make -j"$(nproc)" V=s
+
+      - name: Collect firmware and build metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cp "$OPENWRT_DIR"/bin/targets/x86/64/*squashfs-combined-efi.img.gz release/
+          cp "$OPENWRT_DIR"/bin/targets/x86/64/sha256sums release/
+          printf 'ImmortalWrt source branch: %s\nCommit: %s\nCommit date: %s\n' \
+            "$SOURCE_REF" "$SOURCE_COMMIT" "$SOURCE_DATE" > release/source-build-info.txt
+          sha256sum release/*squashfs-combined-efi.img.gz >> release/sha256sums
+
+      - name: Create release notes
+        run: |
+          cat > router-info.md <<EOF
+          ## x86-64 固件（完整源码编译）
+
+          - 稳定来源：\`openwrt-25.12\`
+          - 源码提交：\`${SOURCE_COMMIT}\`
+          - 源码时间：${SOURCE_DATE}
+          - 管理地址：${{ inputs.custom_router_ip }}
+          - 用户名：root
+          - 网口映射：WAN=eth1；LAN=eth0 eth2 eth3
+          - IPv6：默认启用
           EOF
 
-          if [ "${{ github.event.inputs.include_docker }}" == "yes" ]; then
-            extra_content="#### 默认带docker"
-            echo -e "\n$extra_content" >> ${{ github.workspace }}/router-info.md
-          else
-            echo -e "\n#### 不带docker" >> ${{ github.workspace }}/router-info.md
-          fi
-
-      - name: Upload ImmortWrt as release assets
+      - name: Publish release assets
         uses: softprops/action-gh-release@v3
         with:
           tag_name: Autobuild-x86-64
-          body_path: ${{ github.workspace }}/router-info.md
-          files: |
-            ${{ github.workspace }}/bin/targets/x86/64/*squashfs-combined-efi.img.gz
+          body_path: router-info.md
+          files: release/*
           token: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
